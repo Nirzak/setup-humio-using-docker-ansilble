@@ -1,0 +1,45 @@
+- hosts: all
+  become: yes
+  become_method: sudo
+  tasks:
+  - name: Pull the latest Humio Docker image
+    docker:
+      name: humio/humio
+      image: humio/humio
+      pull: yes
+
+  - name: Create a data directory
+    file:
+      path: {{ item }}
+      state: directory
+      owner: humio
+      group: humio
+      mode: 0755
+      recurse: yes
+    with_items:
+      - /data/humio
+      - /data/kafka-data
+      - /etc/humio
+
+  - name: Creating Configuration File
+    file:
+     path: /etc/humio/humio.conf
+     state: touch
+
+  - name: Configuring Humio
+    lineinfile:
+     path: /etc/humio/humio.conf
+     line: HUMIO_JVM_ARGS=-Xss2M
+
+  - name: Run the Humio Docker container
+    docker:
+      name: humio
+      image: humio/humio
+      ports:
+        - "8080:8080"
+      volumes:
+        - /data/humio:/data
+        - /data/kafka-data:/data/kafka-data
+      env_file:
+        - /etc/humio/humio.conf
+      state: started
